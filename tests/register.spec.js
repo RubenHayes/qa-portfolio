@@ -1,27 +1,11 @@
 import { test, expect } from "@playwright/test";
+const { fillRegistrationForm } = require("./helpers/registerHelper");
 
 test.describe("Register - Happy path", () => {
   test("should register a new user successfully", async ({ page }) => {
-    const uniqueEmail = `test.user.${Date.now()}@example.com`;
-    const password = "Monster!89";
-
     await page.goto("/auth/register");
 
-    await page.locator('[data-test="first-name"]').fill("Ruben");
-    await page.locator('[data-test="last-name"]').fill("Hayes");
-    await page.locator('[data-test="dob"]').fill("1995-12-30");
-    await page.locator('[data-test="country"]').selectOption("ZA");
-    await page.locator('[data-test="postal_code"]').fill("7560");
-    await page.locator('[data-test="house_number"]').fill("45");
-
-    await expect(page.locator('[data-test="city"]')).not.toHaveValue("");
-    await expect(page.locator('[data-test="state"]')).not.toHaveValue("");
-
-    await page.locator('[data-test="phone"]').fill("0820661234");
-    await page.locator('[data-test="email"]').fill(uniqueEmail);
-    await page.locator('[data-test="password"]').fill(password);
-
-    const submitButton = page.locator('[data-test="register-submit"]');
+    await fillRegistrationForm(page);
 
     const [response] = await Promise.all([
       page.waitForResponse(
@@ -29,7 +13,7 @@ test.describe("Register - Happy path", () => {
           resp.url().includes("/users/register") &&
           resp.request().method() === "POST",
       ),
-      submitButton.click(),
+      page.locator('[data-test="register-submit"]').click(),
     ]);
 
     expect(response.status()).toBe(201);
@@ -43,21 +27,9 @@ test.describe("Register - Happy path", () => {
   test("should be able to log in with a newly registered user", async ({
     page,
   }) => {
-    const uniqueEmail = `test.user.${Date.now()}@example.com`;
-    const password = "Monster!89";
-
     await page.goto("/auth/register");
-    await page.locator('[data-test="first-name"]').fill("Ruben");
-    await page.locator('[data-test="last-name"]').fill("Hayes");
-    await page.locator('[data-test="dob"]').fill("1995-12-30");
-    await page.locator('[data-test="country"]').selectOption("ZA");
-    await page.locator('[data-test="postal_code"]').fill("7560");
-    await page.locator('[data-test="house_number"]').fill("45");
-    await expect(page.locator('[data-test="city"]')).not.toHaveValue("");
-    await expect(page.locator('[data-test="state"]')).not.toHaveValue("");
-    await page.locator('[data-test="phone"]').fill("0820661234");
-    await page.locator('[data-test="email"]').fill(uniqueEmail);
-    await page.locator('[data-test="password"]').fill(password);
+
+    const { email, password, firstName } = await fillRegistrationForm(page);
 
     await Promise.all([
       page.waitForResponse(
@@ -70,7 +42,7 @@ test.describe("Register - Happy path", () => {
 
     await expect(page).toHaveURL(/.*\/auth\/login/);
 
-    await page.locator('[data-test="email"]').fill(uniqueEmail);
+    await page.locator('[data-test="email"]').fill(email);
     await page.locator('[data-test="password"]').fill(password);
 
     const [loginResponse] = await Promise.all([
@@ -85,6 +57,64 @@ test.describe("Register - Happy path", () => {
     expect(loginResponse.status()).toBe(200);
     await expect(page).toHaveURL(/.*\/account/);
     await expect(page.locator('[data-test="nav-menu"]')).toBeVisible();
-    await expect(page.locator('[data-test="nav-menu"]')).toContainText("Ruben");
+    await expect(page.locator('[data-test="nav-menu"]')).toContainText(
+      firstName,
+    );
   });
+});
+
+test.describe("Register - Mandatory fields", () => {
+  const mandatoryFieldCases = [
+    {
+      field: "firstName",
+      override: { firstName: "" },
+      errorText: "First name is required",
+    },
+    {
+      field: "lastName",
+      override: { lastName: "" },
+      errorText: "Last name is required",
+    },
+    {
+      field: "country",
+      override: { country: "" },
+      errorText: "Country is required",
+    },
+    {
+      field: "postalCode",
+      override: { postalCode: "" },
+      errorText: "Postcode is required",
+    },
+    {
+      field: "houseNumber",
+      override: { houseNumber: "" },
+      errorText: "House number is required",
+    },
+    {
+      field: "phone",
+      override: { phone: "" },
+      errorText: "Phone is required.",
+    },
+    { field: "email",
+      override: { email: "" },
+      errorText: "Email is required" 
+    },
+    {
+      field: "password",
+      override: { password: "" },
+      errorText: "Password is required",
+    },
+  ];
+
+  for (const { field, override, errorText } of mandatoryFieldCases) {
+    test(`should show validation error when ${field} is missing`, async ({
+      page,
+    }) => {
+      await page.goto("/auth/register");
+      await fillRegistrationForm(page, override);
+      await page.locator('[data-test="register-submit"]').click();
+      await expect(page.getByText(errorText)).toBeVisible();
+      await expect(page).toHaveURL(/.*\/auth\/register/);
+    });
+  }
 });
