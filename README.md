@@ -47,7 +47,7 @@ Based on the target app's published user story: *"As a visitor, I want to regist
 
 - ✅ Happy path — successful registration and login with a newly created user
 - ✅ Mandatory field validation — data-driven tests covering every required field
-- 🔜 Age boundary validation (BVA)
+- ✅ Age boundary validation (BVA) - confirmed real min/max limits via testing; found the actual max-age cutoff (93) doesn't match the AC or the app's own error message (both say 75)
 - 🔜 Email format & duplicate validation (EP)
 - 🔜 Max length validation (name, address, phone)
 - 🔜 Password rule validation (strength, confirm-password match)
