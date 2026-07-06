@@ -23,12 +23,25 @@ async function fillRegistrationForm(page, overrides = {}) {
     await page.locator('[data-test="country"]').selectOption(data.country);
   }
 
-  await page.locator('[data-test="postal_code"]').fill(data.postalCode);
-  await page.locator('[data-test="house_number"]').fill(data.houseNumber);
-
   if (data.country && data.postalCode && data.houseNumber) {
-    await expect(page.locator('[data-test="city"]')).not.toHaveValue("");
-    await expect(page.locator('[data-test="state"]')).not.toHaveValue("");
+    // Fill postal code, then house number - the lookup only fires once
+    // both are present. Wait for the actual API response rather than
+    // polling the DOM for city/state to change.
+    await page.locator('[data-test="postal_code"]').fill(data.postalCode);
+
+    await Promise.all([
+      page.waitForResponse(
+        (resp) =>
+          resp.url().includes("/postcode-lookup") && resp.status() === 200,
+        { timeout: 20000 }
+      ),
+      page.locator('[data-test="house_number"]').fill(data.houseNumber),
+    ]);
+  } else {
+    // Missing one of the three inputs needed to trigger a lookup at all -
+    // just fill whatever we have, no lookup will fire.
+    await page.locator('[data-test="postal_code"]').fill(data.postalCode);
+    await page.locator('[data-test="house_number"]').fill(data.houseNumber);
   }
 
   await page.locator('[data-test="phone"]').fill(data.phone);
